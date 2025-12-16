@@ -5,6 +5,7 @@ import {
   closestCorners,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   MeasuringStrategy,
@@ -51,7 +52,13 @@ const KanbanBoard = () => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, 
+        distance: 5,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -74,7 +81,25 @@ const KanbanBoard = () => {
     };
 
     document.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('touchend', handleGlobalMouseUp);
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('touchend', handleGlobalMouseUp);
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    const preventDefaultForTouches = (e) => {
+      if (isDragging) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventDefaultForTouches, { passive: false });
+
+    return () => {
+      document.removeEventListener('touchmove', preventDefaultForTouches);
+    };
   }, [isDragging]);
 
   const handleDragStart = (event) => {
@@ -86,6 +111,7 @@ const KanbanBoard = () => {
 
     if (active.data.current?.type === 'task') {
       document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
     }
   };
 
@@ -178,6 +204,7 @@ const KanbanBoard = () => {
     setOverColumnId(null);
     setIsDragging(false);
     document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   };
 
   const findColumnByTaskId = (taskId) => {
@@ -240,7 +267,8 @@ const KanbanBoard = () => {
   return (
     <div
       ref={boardRef}
-      className="kanban-board min-h-screen transition-all duration-500"
+      className="kanban-board min-h-screen transition-all duration-500 select-none touch-manipulation"
+      style={{ WebkitUserSelect: 'none', userSelect: 'none' }}
     >
       <div className="mb-8 px-4 md:px-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
@@ -261,6 +289,17 @@ const KanbanBoard = () => {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Drag and drop tasks to organize your workflow
             </p>
+
+            <div className="md:hidden mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16" />
+                </svg>
+                <span className="text-sm text-blue-700 dark:text-blue-300">
+                  <span className="font-semibold">Mobile Tip:</span> Press and hold a task to drag it
+                </span>
+              </div>
+            </div>
 
             {showQuickStats && stats.totalTasks > 0 && (
               <div className="mt-4 max-w-2xl">
@@ -344,9 +383,10 @@ const KanbanBoard = () => {
       >
         <div
           ref={scrollContainerRef}
-          className={`relative px-4 md:px-6 pb-8 ${isDragging ? 'cursor-grabbing' : ''}`}
+          className={`relative px-4 md:px-6 pb-8 ${isDragging ? 'cursor-grabbing select-none' : 'select-none'}`}
+          style={{ userSelect: 'none' }}
         >
-          <div className="flex flex-col md:flex-row gap-4 md:gap-6 overflow-x-auto pb-6 scrollbar-thin">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 overflow-x-auto pb-6 scrollbar-thin touch-pan-x">
             {filteredColumns.length > 0 ? (
               <>
                 <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
@@ -429,19 +469,20 @@ const KanbanBoard = () => {
                           rounded-full ${theme === 'dark' ? 'bg-gray-800/90' : 'bg-white/90'} 
                           border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} 
                           shadow-lg backdrop-blur-sm text-sm text-gray-600 dark:text-gray-300 
-                          flex items-center gap-2 z-30 transition-opacity duration-300`}>
+                          flex items-center gap-2 z-30 transition-opacity duration-300 select-none`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                   d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
               </svg>
-              Drag and drop tasks between columns
+              <span className="hidden md:inline">Drag and drop tasks between columns</span>
+              <span className="md:hidden">Press and hold to drag tasks</span>
             </div>
           )}
         </div>
 
         <DragOverlay dropAnimation={null}>
           {activeId && activeType === 'task' && activeData?.task ? (
-            <div className="transform rotate-3 shadow-2xl opacity-95">
+            <div className="transform rotate-3 shadow-2xl opacity-95 select-none">
               <Task
                 task={activeData.task}
                 columnId={activeData.columnId}
@@ -449,7 +490,7 @@ const KanbanBoard = () => {
               />
             </div>
           ) : activeId && activeType === 'column' && activeData?.column ? (
-            <div className="transform rotate-1 shadow-2xl opacity-90">
+            <div className="transform rotate-1 shadow-2xl opacity-90 select-none">
               <div className={`w-80 rounded-xl p-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} 
                             border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} 
                             shadow-lg`}>
@@ -479,8 +520,8 @@ const KanbanBoard = () => {
         </DragOverlay>
       </DndContext>
 
-      {showQuickStats && stats.totalTasks > 0 && (
-        <div className={`mt-8 mx-4 md:mx-6 p-6 rounded-xl border transition-all duration-500
+      {stats.totalTasks > 0 && (
+        <div className={`mt-8 mx-4 md:px-6 p-6 rounded-xl border transition-all duration-500
           ${theme === 'dark'
             ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700'
             : 'bg-gradient-to-br from-white to-gray-50 border-gray-200'}`}>
@@ -502,98 +543,102 @@ const KanbanBoard = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
-              ${theme === 'dark'
-                ? 'bg-gray-800/30 border-gray-700'
-                : 'bg-white border-gray-200'}`}>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {stats.totalColumns}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Columns</div>
-            </div>
-
-            <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
-              ${theme === 'dark'
-                ? 'bg-gray-800/30 border-gray-700'
-                : 'bg-white border-gray-200'}`}>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {stats.totalTasks}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</div>
-            </div>
-
-            <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
-              ${theme === 'dark'
-                ? 'bg-gray-800/30 border-gray-700'
-                : 'bg-white border-gray-200'}`}>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
-                {stats.completedTasks}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
-            </div>
-
-            <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
-              ${theme === 'dark'
-                ? 'bg-gray-800/30 border-gray-700'
-                : 'bg-white border-gray-200'}`}>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-                {stats.pendingTasks}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-            </div>
-
-            <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
-              ${theme === 'dark'
-                ? 'bg-gray-800/30 border-gray-700'
-                : 'bg-white border-gray-200'}`}>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
-                {stats.completionRate}%
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Completion</div>
-            </div>
-          </div>
-
-          {Object.values(stats.priorityStats).some(count => count > 0) && (
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
-                Tasks by Priority
-              </h4>
-              <div className="grid grid-cols-3 gap-3">
-                <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-red-800/30' : 'border-red-200'} 
-                              ${theme === 'dark' ? 'bg-red-900/10' : 'bg-red-50'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-red-700 dark:text-red-300">High</span>
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+          {showQuickStats && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
+                  ${theme === 'dark'
+                    ? 'bg-gray-800/30 border-gray-700'
+                    : 'bg-white border-gray-200'}`}>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    {stats.totalColumns}
                   </div>
-                  <div className="text-xl font-bold text-red-600 dark:text-red-400">
-                    {stats.priorityStats.high}
-                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Columns</div>
                 </div>
 
-                <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-yellow-800/30' : 'border-yellow-200'} 
-                              ${theme === 'dark' ? 'bg-yellow-900/10' : 'bg-yellow-50'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Medium</span>
-                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
+                  ${theme === 'dark'
+                    ? 'bg-gray-800/30 border-gray-700'
+                    : 'bg-white border-gray-200'}`}>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    {stats.totalTasks}
                   </div>
-                  <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
-                    {stats.priorityStats.medium}
-                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Total Tasks</div>
                 </div>
 
-                <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-green-800/30' : 'border-green-200'} 
-                              ${theme === 'dark' ? 'bg-green-900/10' : 'bg-green-50'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-green-700 dark:text-green-300">Low</span>
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
+                  ${theme === 'dark'
+                    ? 'bg-gray-800/30 border-gray-700'
+                    : 'bg-white border-gray-200'}`}>
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
+                    {stats.completedTasks}
                   </div>
-                  <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                    {stats.priorityStats.low}
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
+                </div>
+
+                <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
+                  ${theme === 'dark'
+                    ? 'bg-gray-800/30 border-gray-700'
+                    : 'bg-white border-gray-200'}`}>
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                    {stats.pendingTasks}
                   </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
+                </div>
+
+                <div className={`p-4 rounded-lg border transition-all duration-300 hover:scale-[1.02]
+                  ${theme === 'dark'
+                    ? 'bg-gray-800/30 border-gray-700'
+                    : 'bg-white border-gray-200'}`}>
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-1">
+                    {stats.completionRate}%
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Completion</div>
                 </div>
               </div>
-            </div>
+
+              {Object.values(stats.priorityStats).some(count => count > 0) && (
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                    Tasks by Priority
+                  </h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-red-800/30' : 'border-red-200'} 
+                                  ${theme === 'dark' ? 'bg-red-900/10' : 'bg-red-50'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-red-700 dark:text-red-300">High</span>
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      </div>
+                      <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                        {stats.priorityStats.high}
+                      </div>
+                    </div>
+
+                    <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-yellow-800/30' : 'border-yellow-200'} 
+                                  ${theme === 'dark' ? 'bg-yellow-900/10' : 'bg-yellow-50'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Medium</span>
+                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                      </div>
+                      <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                        {stats.priorityStats.medium}
+                      </div>
+                    </div>
+
+                    <div className={`p-3 rounded-lg border ${theme === 'dark' ? 'border-green-800/30' : 'border-green-200'} 
+                                  ${theme === 'dark' ? 'bg-green-900/10' : 'bg-green-50'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-green-700 dark:text-green-300">Low</span>
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      </div>
+                      <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                        {stats.priorityStats.low}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -620,9 +665,9 @@ const KanbanBoard = () => {
             <div className="flex items-center gap-2">
               <kbd className={`px-2 py-1 text-xs rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} 
                            ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Double-click
+                Hold
               </kbd>
-              <span>Edit task</span>
+              <span>Drag on mobile</span>
             </div>
           </div>
         </div>

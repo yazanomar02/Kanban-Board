@@ -13,6 +13,8 @@ const Task = ({ task, columnId, index, onDelete }) => {
     const [isHovering, setIsHovering] = useState(false);
     const menuRef = useRef(null);
     const taskRef = useRef(null);
+    const longPressTimer = useRef(null);
+    const isLongPress = useRef(false);
 
     const {
         attributes,
@@ -45,7 +47,11 @@ const Task = ({ task, columnId, index, onDelete }) => {
 
         if (showMenu) {
             document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+                document.removeEventListener('touchstart', handleClickOutside);
+            };
         }
     }, [showMenu]);
 
@@ -71,6 +77,50 @@ const Task = ({ task, columnId, index, onDelete }) => {
         toggleTaskCompletion(columnId, task.id);
         setShowMenu(false);
     };
+
+    const handleTouchStart = (e) => {
+        isLongPress.current = false;
+        longPressTimer.current = setTimeout(() => {
+            isLongPress.current = true;
+            if (listeners && listeners.onPointerDown) {
+                e.preventDefault();
+                const event = new MouseEvent('mousedown', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                });
+                e.target.dispatchEvent(event);
+            }
+        }, 500);
+    };
+
+    const handleTouchEnd = (e) => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+
+        if (!isLongPress.current) {
+            setShowDetail(true);
+        }
+
+        isLongPress.current = false;
+    };
+
+    const handleTouchMove = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current);
+            }
+        };
+    }, []);
 
     const formatDate = (dateString) => {
         try {
@@ -154,23 +204,38 @@ const Task = ({ task, columnId, index, onDelete }) => {
                 }}
                 style={style}
                 className={`
-        relative
-        bg-white dark:bg-gray-800
-        rounded-xl border ${priorityColors.border}
-        p-4 shadow-sm hover:shadow-lg
-        transition-all duration-300 ease-out
-        cursor-grab active:cursor-grabbing
-        ${isDragging ? 'opacity-60 scale-105 shadow-2xl z-50 rotate-2' : ''}
-        ${task.completed ? 'opacity-80' : ''}
-        ${showMenu ? 'z-30' : ''}  // إضافة هذا السطر
-        hover:-translate-y-1
-        group
-    `}
+                    relative
+                    bg-white dark:bg-gray-800
+                    rounded-xl border ${priorityColors.border}
+                    p-4 shadow-sm hover:shadow-lg
+                    transition-all duration-300 ease-out
+                    cursor-grab active:cursor-grabbing
+                    ${isDragging ? 'opacity-60 scale-105 shadow-2xl z-50 rotate-2' : ''}
+                    ${task.completed ? 'opacity-80' : ''}
+                    ${showMenu ? 'z-30' : ''}
+                    hover:-translate-y-1
+                    group
+                    select-none
+                    -webkit-tap-highlight-color: transparent
+                `}
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                onTouchMove={handleTouchMove}
                 {...attributes}
                 {...listeners}
             >
+                <div className="absolute top-2 right-2 md:hidden">
+                    <div className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                d="M4 8h16M4 16h16" />
+                        </svg>
+                        <span className="text-xs font-medium">Hold</span>
+                    </div>
+                </div>
+
                 {task.completed && (
                     <div className="absolute -top-2 -right-2 z-10">
                         <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
@@ -199,17 +264,22 @@ const Task = ({ task, columnId, index, onDelete }) => {
                             e.preventDefault();
                             setShowMenu(!showMenu);
                         }}
+                        onTouchStart={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setShowMenu(!showMenu);
+                        }}
                         className={`
-        absolute top-0 right-0 p-2 rounded-lg
-        transition-all duration-200 z-40
-        ${isHovering || showMenu
+                            absolute top-0 right-0 p-2 rounded-lg
+                            transition-all duration-200 z-40
+                            ${isHovering || showMenu
                                 ? 'opacity-100 transform translate-x-0'
                                 : 'opacity-0 transform translate-x-2'}
-        ${showMenu
+                            ${showMenu
                                 ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                                 : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}
-        hover:bg-gray-100 dark:hover:bg-gray-700
-    `}
+                            hover:bg-gray-100 dark:hover:bg-gray-700
+                        `}
                         title="Task actions"
                         aria-label="Task actions"
                     >
@@ -222,8 +292,8 @@ const Task = ({ task, columnId, index, onDelete }) => {
                     {showMenu && (
                         <div
                             className="absolute right-0 top-10 w-56 bg-white dark:bg-gray-800 
-                   rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 
-                   z-[9999] animate-fade-in"
+                           rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 
+                           z-[9999] animate-fade-in"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="py-2">
@@ -244,12 +314,12 @@ const Task = ({ task, columnId, index, onDelete }) => {
                                             setShowMenu(false);
                                         }}
                                         className="w-full text-left px-4 py-3 text-sm text-gray-700 
-                             dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 
-                             flex items-center gap-3 group/option"
+                                         dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 
+                                         flex items-center gap-3 group/option"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 
-                                  flex items-center justify-center group-hover/option:bg-blue-200 
-                                  dark:group-hover/option:bg-blue-800/40">
+                                              flex items-center justify-center group-hover/option:bg-blue-200 
+                                              dark:group-hover/option:bg-blue-800/40">
                                             <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -267,12 +337,12 @@ const Task = ({ task, columnId, index, onDelete }) => {
                                             handleToggleCompletion();
                                         }}
                                         className="w-full text-left px-4 py-3 text-sm text-gray-700 
-                             dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 
-                             flex items-center gap-3 group/option"
+                                         dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 
+                                         flex items-center gap-3 group/option"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 
-                                  flex items-center justify-center group-hover/option:bg-green-200 
-                                  dark:group-hover/option:bg-green-800/40">
+                                              flex items-center justify-center group-hover/option:bg-green-200 
+                                              dark:group-hover/option:bg-green-800/40">
                                             <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                     d={task.completed ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} />
@@ -295,12 +365,12 @@ const Task = ({ task, columnId, index, onDelete }) => {
                                             setShowMenu(false);
                                         }}
                                         className="w-full text-left px-4 py-3 text-sm text-gray-700 
-                             dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 
-                             flex items-center gap-3 group/option"
+                                         dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 
+                                         flex items-center gap-3 group/option"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 
-                                  flex items-center justify-center group-hover/option:bg-purple-200 
-                                  dark:group-hover/option:bg-purple-800/40">
+                                              flex items-center justify-center group-hover/option:bg-purple-200 
+                                              dark:group-hover/option:bg-purple-800/40">
                                             <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -323,12 +393,12 @@ const Task = ({ task, columnId, index, onDelete }) => {
                                             setShowMenu(false);
                                         }}
                                         className="w-full text-left px-4 py-3 text-sm text-red-600 
-                             dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 
-                             flex items-center gap-3 group/option"
+                                         dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 
+                                         flex items-center gap-3 group/option"
                                     >
                                         <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 
-                                  flex items-center justify-center group-hover/option:bg-red-200 
-                                  dark:group-hover/option:bg-red-800/40">
+                                              flex items-center justify-center group-hover/option:bg-red-200 
+                                              dark:group-hover/option:bg-red-800/40">
                                             <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -371,11 +441,11 @@ const Task = ({ task, columnId, index, onDelete }) => {
                     </div>
 
                     <h4 className={`
-            font-semibold text-lg mb-3 pr-4
-            ${task.completed
+                        font-semibold text-lg mb-3 pr-4
+                        ${task.completed
                             ? 'line-through text-gray-500 dark:text-gray-500'
                             : 'text-gray-900 dark:text-white'}
-          `}>
+                    `}>
                         {task.title}
                     </h4>
 
@@ -391,14 +461,14 @@ const Task = ({ task, columnId, index, onDelete }) => {
                                 <span
                                     key={tag}
                                     className="px-2.5 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 
-                           dark:text-blue-300 rounded-lg text-xs font-medium"
+                                       dark:text-blue-300 rounded-lg text-xs font-medium"
                                 >
                                     #{tag}
                                 </span>
                             ))}
                             {task.tags.length > 3 && (
                                 <span className="px-2.5 py-1 bg-gray-100 text-gray-600 dark:bg-gray-700 
-                               dark:text-gray-400 rounded-lg text-xs font-medium">
+                                           dark:text-gray-400 rounded-lg text-xs font-medium">
                                     +{task.tags.length - 3} more
                                 </span>
                             )}
@@ -425,7 +495,7 @@ const Task = ({ task, columnId, index, onDelete }) => {
                         </div>
 
                         <div className={`flex items-center gap-1 text-gray-400 dark:text-gray-600 
-                          transition-opacity duration-200 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
+                              transition-opacity duration-200 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
                             <div className="w-1 h-1 rounded-full bg-current"></div>
                             <div className="w-1 h-1 rounded-full bg-current"></div>
                             <div className="w-1 h-1 rounded-full bg-current"></div>
@@ -434,10 +504,10 @@ const Task = ({ task, columnId, index, onDelete }) => {
                 </div>
 
                 <div className={`
-          absolute inset-0 rounded-xl pointer-events-none
-          transition-all duration-300
-          ${isHovering ? 'ring-2 ring-blue-500/20 dark:ring-blue-400/20' : ''}
-        `}></div>
+                    absolute inset-0 rounded-xl pointer-events-none
+                    transition-all duration-300
+                    ${isHovering ? 'ring-2 ring-blue-500/20 dark:ring-blue-400/20' : ''}
+                `}></div>
             </div>
 
             {showDetail && (

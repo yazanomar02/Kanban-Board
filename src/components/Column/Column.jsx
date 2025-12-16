@@ -119,10 +119,24 @@ const Column = ({ column, index, isDraggingOver, onDelete }) => {
                 relative
                 group/column
                 flex flex-col
+                min-h-[300px]
+                touch-action: pan-y
+                -webkit-tap-highlight-color: transparent
+                ${isOver || isDraggingOver ? 'border-blue-400 dark:border-blue-500' : ''}
             `}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
         >
             {(isOver || isDraggingOver) && (
                 <div className="absolute inset-0 rounded-2xl bg-blue-500/5 dark:bg-blue-400/5 animate-pulse-glow"></div>
+            )}
+
+            {(isOver || isDraggingOver) && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                    <div className="bg-blue-500/80 dark:bg-blue-400/80 text-white px-4 py-2 rounded-lg text-sm font-medium animate-pulse">
+                        Drop here
+                    </div>
+                </div>
             )}
 
             <ColumnHeader
@@ -136,7 +150,6 @@ const Column = ({ column, index, isDraggingOver, onDelete }) => {
                 completedCount={completedTasks}
             />
 
-            {/* مؤشر التقدم */}
             {column.tasks.length > 0 && (
                 <div className="mt-3 mb-4">
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
@@ -189,7 +202,7 @@ const Column = ({ column, index, isDraggingOver, onDelete }) => {
                 <div
                     ref={tasksContainerRef}
                     onScroll={handleScroll}
-                    className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin pr-1"
+                    className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin pr-1 touch-pan-y"
                 >
                     <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
                         {column.tasks.length > 0 ? (
@@ -253,7 +266,7 @@ const Column = ({ column, index, isDraggingOver, onDelete }) => {
                      dark:hover:from-blue-900/20 dark:hover:to-blue-900/10
                      rounded-xl transition-all duration-300 border-2 border-dashed 
                      border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500
-                     group/button"
+                     group/button touch-target"
                     >
                         <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 
                           flex items-center justify-center group-hover/button:from-blue-600 group-hover/button:to-blue-700 
