@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useKanban } from '../../contexts/KanbanContext';
 
 const TaskDetail = ({ task, columnId, onClose, onEdit, onDelete }) => {

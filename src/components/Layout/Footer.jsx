@@ -1,4 +1,3 @@
-import React from 'react';
 import { useKanban } from '../../contexts/KanbanContext';
 
 const Footer = () => {

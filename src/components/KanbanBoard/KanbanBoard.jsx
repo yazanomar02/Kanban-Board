@@ -222,10 +222,6 @@ const KanbanBoard = () => {
 
   const filteredColumns = getFilteredColumns();
 
-  const allTaskIds = columns.flatMap(column =>
-    column.tasks.map(task => task.id)
-  );
-
   const columnIds = columns.map(col => col.id);
 
   const getCompletionPercentage = () => {

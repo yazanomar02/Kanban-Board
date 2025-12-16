@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 
 const useDragAndDrop = (initialData = null) => {
     const [isDragging, setIsDragging] = useState(false);
